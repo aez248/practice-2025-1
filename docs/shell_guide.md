@@ -2,9 +2,18 @@
 1. Введение
 Данное руководство описывает процесс создания простой командной оболочки (Shell) на языке Python. Проект выполнен в рамках вариативной части проектной (учебной) практики.
 
-Цель руководства — показать, как устроены командные интерпретаторы изнутри, и дать практические навыки работы с системными вызовами, обработкой пользовательского ввода, организацией цикла команд и реализацией встроенных команд.
+Цель руководства — показать, как устроены командные интерпретаторы изнутри, и дать практические навыки работы с:
+
+системными вызовами (os, subprocess);
+
+обработкой пользовательского ввода;
+
+организацией цикла команд;
+
+реализацией встроенных команд.
 
 2. Что такое Shell?
+
 Shell (командная оболочка) — это программа, которая принимает команды от пользователя (ввод с клавиатуры), интерпретирует их и выполняет соответствующие действия.
 
 Примеры популярных оболочек:
@@ -22,262 +31,130 @@ PowerShell (Windows)
 3. Архитектура проекта
 Проект состоит из трёх модулей, каждый из которых отвечает за свою часть функциональности.
 
-Модули:
+Модули
+Модуль	Назначение
+main.py	Точка входа. Создаёт экземпляр класса Shell и запускает его.
 
-main.py — точка входа. Создаёт экземпляр класса Shell и запускает его.
+shell.py	Основная логика: цикл ввода-вывода, выполнение команд, обработка ошибок.
 
-shell.py — основная логика: цикл ввода-вывода, выполнение команд, обработка ошибок.
+commands.py	Набор встроенных команд: cd, exit, help, history.
 
-commands.py — набор встроенных команд: cd, exit, help, history.
+Структура
 
-Структура:
+<img width="746" height="114" alt="image" src="https://github.com/user-attachments/assets/b3856750-da1a-46f1-a85d-fccde4f8a593" />
 
-src/
-├── main.py # точка входа
-├── shell.py # класс Shell
-└── commands.py # встроенные команды
+4. Диаграмма классов
 
-4. Описание классов и функций
-Класс Shell:
 
-history: список всех введённых команд
+<img width="687" height="927" alt="image" src="https://github.com/user-attachments/assets/81e6730f-9028-48d3-a75c-beef9f0b6a68" />
 
-prompt: строка приглашения (по умолчанию "$ > ")
 
-run(): запускает главный цикл оболочки
 
-execute(command): выполняет переданную команду
+Описание:
 
-Модуль commands.py содержит функции для встроенных команд:
+Класс Shell управляет жизненным циклом оболочки: приглашение, чтение команд, выполнение.
 
-cmd_cd(args, shell) — смена текущей директории
+Модуль BuiltinCommands содержит статические функции для встроенных команд, которые вызываются из Shell.execute().
 
-cmd_exit(args, shell) — выход из оболочки
+5. Схема работы
+Ниже представлена упрощённая схема работы оболочки.
 
-cmd_help(args, shell) — вывод справки
-
-cmd_history(args, shell) — вывод истории команд
-
-Все встроенные команды собраны в словарь builtin_commands, который используется в shell.py для проверки, является ли команда встроенной.
-
-5. Схема работы оболочки
-Пользователь вводит команду в терминале.
-
-Программа считывает ввод через input().
-
-Команда добавляется в историю (history).
-
-Выполняется парсинг: команда разбивается на имя и аргументы.
-
-Проверяется, является ли команда встроенной (есть в словаре builtin_commands).
-
-Если команда встроенная — вызывается соответствующая функция.
-
-Если команда не встроенная — она запускается как внешняя программа через subprocess.run().
-
-Результат выполнения (stdout или stderr) выводится пользователю.
-
-Цикл повторяется с шага 1.
+<img width="669" height="701" alt="image" src="https://github.com/user-attachments/assets/1de92ffa-ef00-4f12-8c5d-ca955e13c72a" />
 
 6. Пошаговая инструкция по созданию
+
 Шаг 1. Создание класса Shell
 
-class Shell:
-def init(self):
-self.history = []
-self.prompt = "$ > "
+Класс Shell хранит состояние оболочки: историю команд и приглашение.
+
+<img width="597" height="120" alt="image" src="https://github.com/user-attachments/assets/26cfd0de-66ad-4800-b66e-f54b40777670" />
+
 
 Шаг 2. Главный цикл
 
-def run(self):
-while True:
-try:
-command = input(self.prompt).strip()
-if not command:
-continue
-self.history.append(command)
-self.execute(command)
-except EOFError:
-print("\nВыход...")
-break
-except KeyboardInterrupt:
-print("\nВыход...")
-break
+Метод run() запускает бесконечный цикл, который:
+
+выводит приглашение;
+
+читает команду пользователя;
+
+добавляет её в историю;
+
+передаёт на выполнение.
+
+<img width="618" height="328" alt="image" src="https://github.com/user-attachments/assets/096037f3-bd1a-459d-852c-67fac56993ba" />
 
 Шаг 3. Обработка команд
 
-def execute(self, command):
-parts = command.split()
-cmd = parts[0]
-args = parts[1:] if len(parts) > 1 else []
+Метод execute():
 
-if cmd in builtin_commands:
-builtin_commands[cmd](args, self)
-return
+разбивает команду на части (команда + аргументы);
 
-try:
-result = subprocess.run([cmd] + args, capture_output=True, text=True)
-if result.stdout:
-print(result.stdout, end='')
-if result.stderr:
-print(result.stderr, end='', file=sys.stderr)
-except FileNotFoundError:
-print(f"Команда не найдена: {cmd}", file=sys.stderr)
-except Exception as e:
-print(f"Ошибка: {e}", file=sys.stderr)
+проверяет, есть ли команда в списке встроенных;
 
-Шаг 4. Реализация встроенных команд (commands.py)
+если нет — пытается запустить внешнюю программу через subprocess.
 
-Команда cd — смена директории:
+<img width="608" height="449" alt="image" src="https://github.com/user-attachments/assets/af5227a6-ac98-4613-a396-fa926e4131a8" />
 
-def cmd_cd(args, shell):
-if not args:
-target = os.path.expanduser("~")
-else:
-target = args[0]
-try:
-os.chdir(target)
-except FileNotFoundError:
-print(f"Директория не найдена: {target}", file=sys.stderr)
-except NotADirectoryError:
-print(f"Не является директорией: {target}", file=sys.stderr)
-except PermissionError:
-print(f"Нет доступа к: {target}", file=sys.stderr)
+Шаг 4. Реализация встроенных команд
 
-Команда exit — выход:
+В модуле commands.py определяются функции для каждой встроенной команды.
 
-def cmd_exit(args, shell):
-print("Выход...")
-sys.exit(0)
+Команда cd — смена директории
 
-Команда help — справка:
+<img width="566" height="311" alt="image" src="https://github.com/user-attachments/assets/b797aa46-e227-45a8-9454-eebc6ae0e5e0" />
 
-def cmd_help(args, shell):
-help_text = """
-Доступные команды:
-cd [dir] — сменить текущую директорию
-exit — выйти из оболочки
-help — показать эту справку
-history — показать историю команд
+Команда exit — выход
 
-Также можно запускать любые внешние программы (ls, pwd, echo и т.д.)
-"""
-print(help_text)
+<img width="489" height="82" alt="image" src="https://github.com/user-attachments/assets/5bd3b951-e5e2-4425-983e-aa436d49acff" />
 
-Команда history — история команд:
+Команда help — справка
 
-def cmd_history(args, shell):
-for i, cmd in enumerate(shell.history, 1):
-print(f"{i:4} {cmd}")
+<img width="580" height="264" alt="image" src="https://github.com/user-attachments/assets/f8cd925f-85f6-4cce-9244-774777e4fe45" />
 
-Шаг 5. Регистрация команд в словаре
+Команда history — история команд
 
-builtin_commands = {
-"cd": cmd_cd,
-"exit": cmd_exit,
-"help": cmd_help,
-"history": cmd_history,
-}
+<img width="492" height="96" alt="image" src="https://github.com/user-attachments/assets/3bc5b925-e53b-48e7-8424-419366834d2e" />
+
+Шаг 5. Регистрация команд
+
+Все встроенные команды собираются в словарь builtin_commands.
+
+<img width="545" height="162" alt="image" src="https://github.com/user-attachments/assets/0957a051-0151-4572-8e9e-772c23d1e146" />
 
 Шаг 6. Точка входа (main.py)
 
-#!/usr/bin/env python3
-import sys
-from shell import Shell
-
-def main():
-shell = Shell()
-try:
-shell.run()
-except KeyboardInterrupt:
-print("\nВыход...")
-sys.exit(0)
-
-if name == "main":
-main()
+<img width="590" height="329" alt="image" src="https://github.com/user-attachments/assets/93acbbf8-bf22-4d79-88a2-6aaf4fbca4f0" />
 
 7. Пример работы программы
+
 Запуск:
 
 python src/main.py
 
 Пример сессии:
 
-$ > help
-Доступные команды:
-cd [dir] — сменить текущую директорию
-exit — выйти из оболочки
-help — показать эту справку
-history — показать историю команд
-
-Также можно запускать любые внешние программы (ls, pwd, echo и т.д.)
-
->
-c
-d
-/
->cd/ > pwd
-/
->
-e
-c
-h
-o
-"
-H
-e
-l
-l
-o
-,
-S
-h
-e
-l
-l
-!
-"
-H
-e
-l
-l
-o
-,
-S
-h
-e
-l
-l
-!
->echo"Hello,Shell!"Hello,Shell! > history
-1 help
-2 cd /
-3 pwd
-4 echo "Hello, Shell!"
-$ > exit
-Выход...
+<img width="606" height="480" alt="image" src="https://github.com/user-attachments/assets/e4be885f-30a3-4702-b4f5-def32bd92d59" />
 
 8. Возможные улучшения
+
 После базовой реализации можно добавить:
 
-Поддержка пайпов (|) — объединение нескольких команд.
+Функция	Описание
 
-Переменные окружения — поддержка 
-P
-A
-T
-H
-,
-PATH,HOME.
+Поддержка пайпов (│)	Объединение команд
 
-Автодополнение команд по нажатию Tab.
+Переменные окружения	$PATH, $HOME
 
-Выполнение сценариев (скриптов) из файлов.
+Автодополнение	По нажатию Tab
 
-Цветной вывод для улучшения читаемости.
+Сценарии (скрипты)	Выполнение из файла
+
+Цветной вывод	Подсветка приглашения и ошибок
 
 9. Заключение
-В ходе выполнения проекта была создана собственная командная оболочка на Python. Реализованы встроенные команды и механизм запуска внешних программ.
+
+В ходе выполнения проекта была создана собственная командная оболочка на Python, реализованы встроенные команды и механизм запуска внешних программ.
 
 Руководство демонстрирует:
 
@@ -290,7 +167,7 @@ PATH,HOME.
 Данный проект может служить отправной точкой для создания более сложных систем, таких как собственный язык сценариев или облегчённая версия bash.
 
 10. Источники
-Build your own Shell: https://github.com/codecrafters-io/build-your-own-x#build-your-own-shell
+Build your own Shell
 
 Документация Python: os — https://docs.python.org/3/library/os.html
 
